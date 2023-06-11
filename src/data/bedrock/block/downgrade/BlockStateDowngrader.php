@@ -68,16 +68,31 @@ final class BlockStateDowngrader{
 			$oldState = $blockStateData->getStates();
 			if(isset($schema->remappedStates[$oldName])){
 				foreach($schema->remappedStates[$oldName] as $remap){
-					if(count($oldState) !== count($remap->oldState)){
+					$shouldCopyStates = [];
+					foreach($remap->copiedState as $key){
+						if(isset($oldState[$key])){
+							$shouldCopyStates[$key] = $oldState[$key];
+						}
+					}
+					if(count($oldState) - count($shouldCopyStates) !== count($remap->oldState)){
 						continue; //try next state
 					}
 					foreach(Utils::stringifyKeys($oldState) as $k => $v){
+						if(isset($shouldCopyStates[$k])){
+							continue;
+						}
 						if(!isset($remap->oldState[$k]) || !$remap->oldState[$k]->equals($v)){
 							continue 2; //try next state
 						}
 					}
-
-					$blockStateData = new BlockStateData($remap->newName, $remap->newState, $resultVersion);
+					$newStates = $remap->newState;
+					foreach(Utils::stringifyKeys($shouldCopyStates) as $key => $value){
+						if(!isset($newStates[$key])){
+							$newStates[$key] = $value;
+						}
+						//is there need something else for isset?
+					}
+					$blockStateData = new BlockStateData($remap->newName, $newStates, $resultVersion);
 					continue 2; //try next schema
 				}
 			}
