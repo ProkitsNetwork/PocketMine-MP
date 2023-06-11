@@ -34,31 +34,31 @@ final class CreativeInventoryCache{
 	use SingletonTrait;
 
 	/**
-	 * @var CreativeContentPacket[]
+	 * @var CreativeContentPacket[][]
 	 * @phpstan-var array<int, CreativeContentPacket>
 	 */
 	private array $caches = [];
 
-	public function getCache(CreativeInventory $inventory) : CreativeContentPacket{
+	public function getCache(CreativeInventory $inventory, int $protocolId) : CreativeContentPacket{
 		$id = spl_object_id($inventory);
-		if(!isset($this->caches[$id])){
+		if(!isset($this->caches[$id][$protocolId])){
 			$inventory->getDestructorCallbacks()->add(function() use ($id) : void{
 				unset($this->caches[$id]);
 			});
 			$inventory->getContentChangedCallbacks()->add(function() use ($id) : void{
 				unset($this->caches[$id]);
 			});
-			$this->caches[$id] = $this->buildCreativeInventoryCache($inventory);
+			$this->caches[$id][$protocolId] = $this->buildCreativeInventoryCache($inventory, $protocolId);
 		}
-		return $this->caches[$id];
+		return $this->caches[$id][$protocolId];
 	}
 
 	/**
 	 * Rebuild the cache for the given inventory.
 	 */
-	private function buildCreativeInventoryCache(CreativeInventory $inventory) : CreativeContentPacket{
+	private function buildCreativeInventoryCache(CreativeInventory $inventory, int $protocolId) : CreativeContentPacket{
 		$entries = [];
-		$typeConverter = TypeConverter::getInstance();
+		$typeConverter = TypeConverter::getInstance($protocolId);
 		//creative inventory may have holes if items were unregistered - ensure network IDs used are always consistent
 		foreach($inventory->getAll() as $k => $item){
 			$entries[] = new CreativeContentEntry($k, $typeConverter->coreItemStackToNet($item));

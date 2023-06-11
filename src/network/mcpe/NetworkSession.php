@@ -973,7 +973,7 @@ class NetworkSession{
 			$this->syncAdventureSettings(); //TODO: we might be able to do this with the abilities packet alone
 		}
 		if(!$isRollback && $this->invManager !== null){
-			$this->invManager->syncCreative();
+			$this->invManager->syncCreative($this->getProtocolId());
 		}
 	}
 
