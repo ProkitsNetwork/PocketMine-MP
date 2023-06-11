@@ -86,7 +86,7 @@ final class BlockStateDowngrader{
 						}
 					}
 					$newStates = $remap->newState;
-					foreach($shouldCopyStates as $key => $value){
+					foreach(Utils::stringifyKeys($shouldCopyStates) as $key => $value){
 						if(!isset($newStates[$key])){
 							$newStates[$key] = $value;
 						}
