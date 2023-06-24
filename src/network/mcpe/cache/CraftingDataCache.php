@@ -33,6 +33,7 @@ use pocketmine\item\Item;
 use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\CraftingDataPacket;
+use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 use pocketmine\network\mcpe\protocol\types\recipe\CraftingRecipeBlockName;
 use pocketmine\network\mcpe\protocol\types\recipe\FurnaceRecipe as ProtocolFurnaceRecipe;
@@ -43,6 +44,7 @@ use pocketmine\network\mcpe\protocol\types\recipe\PotionTypeRecipe as ProtocolPo
 use pocketmine\network\mcpe\protocol\types\recipe\RecipeIngredient as ProtocolRecipeIngredient;
 use pocketmine\network\mcpe\protocol\types\recipe\ShapedRecipe as ProtocolShapedRecipe;
 use pocketmine\network\mcpe\protocol\types\recipe\ShapelessRecipe as ProtocolShapelessRecipe;
+use pocketmine\Server;
 use pocketmine\timings\Timings;
 use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\Binary;
@@ -56,8 +58,8 @@ final class CraftingDataCache{
 	use ProtocolSingletonTrait;
 
 	/**
-	 * @var CraftingDataPacket[]
-	 * @phpstan-var array<int, CraftingDataPacket>
+	 * @var string[]
+	 * @phpstan-var array<int, string>
 	 */
 	private array $caches = [];
 
@@ -67,7 +69,7 @@ final class CraftingDataCache{
 		$this->protocolId = $protocolId;
 	}
 
-	public function getCache(CraftingManager $manager) : CraftingDataPacket{
+	public function getCache(CraftingManager $manager) : string{
 		$id = spl_object_id($manager);
 		if(!isset($this->caches[$id])){
 			$manager->getDestructorCallbacks()->add(function() use ($id) : void{
@@ -84,7 +86,7 @@ final class CraftingDataCache{
 	/**
 	 * Rebuilds the cached CraftingDataPacket.
 	 */
-	private function buildCraftingDataCache(CraftingManager $manager) : CraftingDataPacket{
+	private function buildCraftingDataCache(CraftingManager $manager) : string{
 		Timings::$craftingDataCacheRebuild->startTiming();
 
 		$nullUUID = Uuid::fromString(Uuid::NIL);
@@ -242,7 +244,10 @@ final class CraftingDataCache{
 		}
 
 		Timings::$craftingDataCacheRebuild->stopTiming();
-		return CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true);
+		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($this->protocolId));
+		CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true)
+			->encode($s);
+		return $s->getBuffer();
 	}
 
 	public static function convertProtocol(int $protocolId) : int{

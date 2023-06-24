@@ -24,53 +24,64 @@ declare(strict_types=1);
 namespace pocketmine\network\mcpe\cache;
 
 use pocketmine\inventory\CreativeInventory;
+use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\CreativeContentPacket;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\CreativeContentEntry;
 use pocketmine\Server;
-use pocketmine\utils\SingletonTrait;
+use pocketmine\utils\ProtocolSingletonTrait;
 use function spl_object_id;
 
 final class CreativeInventoryCache{
-	use SingletonTrait;
+	use ProtocolSingletonTrait;
 
 	/**
-	 * @var string[][]
-	 * @phpstan-var array<int, array<int, string>>
+	 * @var string[]
+	 * @phpstan-var array<int, string>
 	 */
 	private array $caches = [];
 
-	public function getCache(CreativeInventory $inventory, int $protocolId) : string{
+	private int $protocolId;
+
+	public function __construct(int $protocolId){
+		$this->protocolId = $protocolId;
+	}
+
+	public function getCache(CreativeInventory $inventory) : string{
 		$id = spl_object_id($inventory);
-		if(!isset($this->caches[$id][$protocolId])){
+		if(!isset($this->caches[$id])){
 			$inventory->getDestructorCallbacks()->add(function() use ($id) : void{
 				unset($this->caches[$id]);
 			});
 			$inventory->getContentChangedCallbacks()->add(function() use ($id) : void{
 				unset($this->caches[$id]);
 			});
-			$this->caches[$id][$protocolId] = $this->buildCreativeInventoryCache($inventory, $protocolId);
+			$this->caches[$id] = $this->buildCreativeInventoryCache($inventory);
 		}
-		return $this->caches[$id][$protocolId];
+		return $this->caches[$id];
 	}
 
 	/**
 	 * Rebuild the cache for the given inventory.
 	 */
-	private function buildCreativeInventoryCache(CreativeInventory $inventory, int $protocolId) : string{
+	private function buildCreativeInventoryCache(CreativeInventory $inventory) : string{
 		$entries = [];
-		$typeConverter = TypeConverter::getInstance($protocolId);
+		$typeConverter = TypeConverter::getInstance($this->protocolId);
 		//creative inventory may have holes if items were unregistered - ensure network IDs used are always consistent
 		foreach($inventory->getAll() as $k => $item){
-			try {
+			try{
 				$entries[] = new CreativeContentEntry($k, $typeConverter->coreItemStackToNet($item));
-			} catch(\InvalidArgumentException $e){
+			}catch(\InvalidArgumentException $e){
 				//Item is not supported on this protocol, skip it
 			}
 		}
-		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($protocolId));
+		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($this->protocolId));
 		CreativeContentPacket::create($entries)->encode($s);
 		return $s->getBuffer();
+	}
+
+	public static function convertProtocol(int $protocolId) : int{
+		return ItemTranslator::convertProtocol($protocolId);
 	}
 }
