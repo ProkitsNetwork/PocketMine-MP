@@ -603,7 +603,7 @@ class InventoryManager{
 	}
 
 	public function syncCreative(int $protocolId) : void{
-		$this->session->sendDataPacket(CreativeInventoryCache::getInstance()->getCache(CreativeInventory::getInstance(), $protocolId));
+		$this->session->addToSendBuffer(CreativeInventoryCache::getInstance()->getCache(CreativeInventory::getInstance(), $protocolId));
 	}
 
 	private function newItemStackId() : int{

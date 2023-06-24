@@ -26,7 +26,9 @@ namespace pocketmine\network\mcpe\cache;
 use pocketmine\inventory\CreativeInventory;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\CreativeContentPacket;
+use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\types\inventory\CreativeContentEntry;
+use pocketmine\Server;
 use pocketmine\utils\SingletonTrait;
 use function spl_object_id;
 
@@ -34,12 +36,12 @@ final class CreativeInventoryCache{
 	use SingletonTrait;
 
 	/**
-	 * @var CreativeContentPacket[][]
-	 * @phpstan-var array<int, CreativeContentPacket>
+	 * @var string[][]
+	 * @phpstan-var array<int, array<int, string>>
 	 */
 	private array $caches = [];
 
-	public function getCache(CreativeInventory $inventory, int $protocolId) : CreativeContentPacket{
+	public function getCache(CreativeInventory $inventory, int $protocolId) : string{
 		$id = spl_object_id($inventory);
 		if(!isset($this->caches[$id][$protocolId])){
 			$inventory->getDestructorCallbacks()->add(function() use ($id) : void{
@@ -56,7 +58,7 @@ final class CreativeInventoryCache{
 	/**
 	 * Rebuild the cache for the given inventory.
 	 */
-	private function buildCreativeInventoryCache(CreativeInventory $inventory, int $protocolId) : CreativeContentPacket{
+	private function buildCreativeInventoryCache(CreativeInventory $inventory, int $protocolId) : string{
 		$entries = [];
 		$typeConverter = TypeConverter::getInstance($protocolId);
 		//creative inventory may have holes if items were unregistered - ensure network IDs used are always consistent
@@ -67,7 +69,8 @@ final class CreativeInventoryCache{
 				//Item is not supported on this protocol, skip it
 			}
 		}
-
-		return CreativeContentPacket::create($entries);
+		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($protocolId));
+		CreativeContentPacket::create($entries)->encode($s);
+		return $s->getBuffer();
 	}
 }
