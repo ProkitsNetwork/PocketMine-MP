@@ -45,8 +45,7 @@ use pocketmine\nbt\tag\DoubleTag;
 use pocketmine\nbt\tag\FloatTag;
 use pocketmine\nbt\tag\ListTag;
 use pocketmine\nbt\tag\StringTag;
-use pocketmine\network\mcpe\convert\BlockTranslator;
-use pocketmine\network\mcpe\convert\ItemTranslator;
+use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\EntityEventBroadcaster;
 use pocketmine\network\mcpe\NetworkBroadcastUtils;
 use pocketmine\network\mcpe\protocol\AddActorPacket;
@@ -1680,11 +1679,10 @@ abstract class Entity{
 		$targets = $targets ?? $this->getViewers();
 
 		if($animation instanceof ItemAnimation){
-			foreach(ItemTranslator::sortByProtocol($targets) as $dictionaryProtocol => $players){
-				$animation->setProtocolId($dictionaryProtocol);
-
-				NetworkBroadcastUtils::broadcastPackets($players, $animation->encode());
-			}
+			TypeConverter::broadcastByTypeConverter($targets, function(TypeConverter $typeConverter) use ($animation) : array{
+				$animation->setItemTranslator($typeConverter->getItemTranslator());
+				return $animation->encode();
+			});
 		}else{
 			NetworkBroadcastUtils::broadcastPackets($targets, $animation->encode());
 		}
@@ -1699,11 +1697,10 @@ abstract class Entity{
 			$targets = $targets ?? $this->getViewers();
 
 			if($sound instanceof BlockSound){
-				foreach(BlockTranslator::sortByProtocol($targets) as $mappingProtocol => $players){
-					$sound->setProtocolId($mappingProtocol);
-
-					NetworkBroadcastUtils::broadcastPackets($players, $sound->encode($this->location));
-				}
+				TypeConverter::broadcastByTypeConverter($targets, function(TypeConverter $typeConverter) use ($sound) : array{
+					$sound->setBlockTranslator($typeConverter->getBlockTranslator());
+					return $sound->encode($this->location);
+				});
 			}else{
 				NetworkBroadcastUtils::broadcastPackets($targets, $sound->encode($this->location));
 			}

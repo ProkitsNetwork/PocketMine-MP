@@ -143,7 +143,7 @@ class PreSpawnPacketHandler extends ChunkRequestPacketHandler{
 			$this->inventoryManager->syncSelectedHotbarSlot();
 
 			$this->session->getLogger()->debug("Sending creative inventory data");
-			$this->inventoryManager->syncCreative($this->session->getProtocolId());
+			$this->inventoryManager->syncCreative();
 
 			$this->session->getLogger()->debug("Sending crafting data");
 			$this->session->addToSendBuffer(CraftingDataCache::getInstance($protocolId)->getCache($this->server->getCraftingManager()));

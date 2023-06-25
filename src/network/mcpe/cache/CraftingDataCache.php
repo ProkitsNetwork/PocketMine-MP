@@ -29,8 +29,8 @@ use pocketmine\crafting\RecipeIngredient;
 use pocketmine\crafting\ShapedRecipe;
 use pocketmine\crafting\ShapelessRecipe;
 use pocketmine\crafting\ShapelessRecipeType;
+use pocketmine\data\bedrock\item\ItemTypeSerializeException;
 use pocketmine\item\Item;
-use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\CraftingDataPacket;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
@@ -62,12 +62,6 @@ final class CraftingDataCache{
 	 * @phpstan-var array<int, string>
 	 */
 	private array $caches = [];
-
-	private int $protocolId;
-
-	public function __construct(int $protocolId){
-		$this->protocolId = $protocolId;
-	}
 
 	public function getCache(CraftingManager $manager) : string{
 		$id = spl_object_id($manager);
@@ -104,16 +98,16 @@ final class CraftingDataCache{
 				};
 
 				$inputs = array_map(function(RecipeIngredient $item) use ($converter) : ?ProtocolRecipeIngredient{
-					try {
+					try{
 						return $converter->coreRecipeIngredientToNet($item);
-					} catch(\InvalidArgumentException $e){
+					}catch(\InvalidArgumentException|ItemTypeSerializeException){
 						return null;
 					}
 				}, $recipe->getIngredientList());
 				$outputs = array_map(function(Item $item) use ($converter) : ?ItemStack{
-					try {
+					try{
 						return $converter->coreItemStackToNet($item);
-					} catch(\InvalidArgumentException $e){
+					}catch(\InvalidArgumentException|ItemTypeSerializeException){
 						return null;
 					}
 				}, $recipe->getResults());
@@ -135,20 +129,20 @@ final class CraftingDataCache{
 			}elseif($recipe instanceof ShapedRecipe){
 				$inputs = [];
 
-				try {
+				try{
 					for($row = 0, $height = $recipe->getHeight(); $row < $height; ++$row){
 						for($column = 0, $width = $recipe->getWidth(); $column < $width; ++$column){
 							$inputs[$row][$column] = $converter->coreRecipeIngredientToNet($recipe->getIngredient($column, $row));
 						}
 					}
-				} catch(\InvalidArgumentException $e){
+				}catch(\InvalidArgumentException|ItemTypeSerializeException){
 					continue;
 				}
 
 				$outputs = array_map(function(Item $item) use ($converter) : ?ItemStack{
-					try {
+					try{
 						return $converter->coreItemStackToNet($item);
-					} catch(\InvalidArgumentException $e){
+					}catch(\InvalidArgumentException|ItemTypeSerializeException){
 						return null;
 					}
 				}, $recipe->getResults());
@@ -177,13 +171,14 @@ final class CraftingDataCache{
 				FurnaceType::FURNACE()->id() => FurnaceRecipeBlockName::FURNACE,
 				FurnaceType::BLAST_FURNACE()->id() => FurnaceRecipeBlockName::BLAST_FURNACE,
 				FurnaceType::SMOKER()->id() => FurnaceRecipeBlockName::SMOKER,
+				ShapelessRecipeType::SMITHING()->id() => CraftingRecipeBlockName::SMITHING_TABLE,
 				default => throw new AssumptionFailedError("Unreachable"),
 			};
 			foreach($manager->getFurnaceRecipeManager($furnaceType)->getAll() as $recipe){
-				try {
+				try{
 					$input = $converter->coreRecipeIngredientToNet($recipe->getInput())->getDescriptor();
 					$output = $converter->coreItemStackToNet($recipe->getResult());
-				} catch(\InvalidArgumentException $e){
+				}catch(\InvalidArgumentException|ItemTypeSerializeException){
 					continue;
 				}
 
@@ -202,14 +197,14 @@ final class CraftingDataCache{
 
 		$potionTypeRecipes = [];
 		foreach($manager->getPotionTypeRecipes() as $recipe){
-			try {
+			try{
 				$input = $converter->coreRecipeIngredientToNet($recipe->getInput())->getDescriptor();
 				$ingredient = $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor();
 				if(!$input instanceof IntIdMetaItemDescriptor || !$ingredient instanceof IntIdMetaItemDescriptor){
 					throw new AssumptionFailedError();
 				}
 				$output = $converter->coreItemStackToNet($recipe->getOutput());
-			} catch(\InvalidArgumentException $e){
+			}catch(\InvalidArgumentException|ItemTypeSerializeException){
 				continue;
 			}
 
@@ -224,12 +219,12 @@ final class CraftingDataCache{
 		}
 
 		$potionContainerChangeRecipes = [];
-		$itemTypeDictionary = TypeConverter::getInstance($this->protocolId)->getItemTypeDictionary();
+		$itemTypeDictionary = $converter->getItemTypeDictionary();
 		foreach($manager->getPotionContainerChangeRecipes() as $recipe){
 			$input = $itemTypeDictionary->fromStringId($recipe->getInputItemId());
-			try {
+			try{
 				$ingredient = $converter->coreRecipeIngredientToNet($recipe->getIngredient())->getDescriptor();
-			} catch(\InvalidArgumentException $e){
+			}catch(\InvalidArgumentException|ItemTypeSerializeException){
 				continue;
 			}
 			if(!$ingredient instanceof IntIdMetaItemDescriptor){
@@ -244,13 +239,9 @@ final class CraftingDataCache{
 		}
 
 		Timings::$craftingDataCacheRebuild->stopTiming();
-		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($this->protocolId));
+		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext(TypeConverter::getInstance($this->protocolId)));
 		CraftingDataPacket::create($recipesWithTypeIds, $potionTypeRecipes, $potionContainerChangeRecipes, [], true)
 			->encode($s);
 		return $s->getBuffer();
-	}
-
-	public static function convertProtocol(int $protocolId) : int{
-		return ItemTranslator::convertProtocol($protocolId);
 	}
 }

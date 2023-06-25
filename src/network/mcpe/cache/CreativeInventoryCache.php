@@ -42,12 +42,6 @@ final class CreativeInventoryCache{
 	 */
 	private array $caches = [];
 
-	private int $protocolId;
-
-	public function __construct(int $protocolId){
-		$this->protocolId = $protocolId;
-	}
-
 	public function getCache(CreativeInventory $inventory) : string{
 		$id = spl_object_id($inventory);
 		if(!isset($this->caches[$id])){
@@ -76,7 +70,7 @@ final class CreativeInventoryCache{
 				//Item is not supported on this protocol, skip it
 			}
 		}
-		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext($this->protocolId));
+		$s = PacketSerializer::encoder(Server::getInstance()->getPacketSerializerContext(TypeConverter::getInstance($this->protocolId)));
 		CreativeContentPacket::create($entries)->encode($s);
 		return $s->getBuffer();
 	}

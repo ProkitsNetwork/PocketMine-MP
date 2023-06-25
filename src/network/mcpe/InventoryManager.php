@@ -602,8 +602,8 @@ class InventoryManager{
 		}
 	}
 
-	public function syncCreative(int $protocolId) : void{
-		$this->session->addToSendBuffer(CreativeInventoryCache::getInstance($protocolId)->getCache(CreativeInventory::getInstance()));
+	public function syncCreative() : void{
+		$this->session->addToSendBuffer(CreativeInventoryCache::getInstance($this->session->getProtocolId())->getCache(CreativeInventory::getInstance()));
 	}
 
 	private function newItemStackId() : int{
